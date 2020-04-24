@@ -14,15 +14,12 @@ public class ProvinciaEntity {
     
     @Id @Column(name = "id")
     @GenericGenerator(name = "provincias_generator", 
-            strategy = "com.iait.concurrency.generators.CustomGenerator")
+            strategy = "com.iait.generators.CustomGenerator")
     @GeneratedValue(generator = "provincias_generator")
     private Long id;
     
     @Column(name = "nombre", nullable = false)
     private String nombre;
-    
-    @Column(name = "nombre_abreviado", nullable = false)
-    private String nombreAbreviado;
     
     public ProvinciaEntity() {}
     
@@ -40,14 +37,6 @@ public class ProvinciaEntity {
     
     public void setNombre(String nombre) {
         this.nombre = nombre;
-    }
-    
-    public String getNombreAbreviado() {
-        return nombreAbreviado;
-    }
-    
-    public void setNombreAbreviado(String nombreAbreviado) {
-        this.nombreAbreviado = nombreAbreviado;
     }
     
     @Override

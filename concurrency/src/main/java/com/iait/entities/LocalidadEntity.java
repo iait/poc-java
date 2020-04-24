@@ -17,15 +17,12 @@ public class LocalidadEntity {
     
     @Id @Column(name = "id")
     @GenericGenerator(name = "localidades_generator", 
-            strategy = "com.iait.concurrency.generators.CustomGenerator")
+            strategy = "com.iait.generators.CustomGenerator")
     @GeneratedValue(generator = "localidades_generator")
     private Long id;
     
     @Column(name = "nombre", nullable = false)
     private String nombre;
-    
-    @Column(name = "nombre_abreviado")
-    private String nombreAbreviado;
     
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "provincia_id", referencedColumnName = "id")
@@ -47,14 +44,6 @@ public class LocalidadEntity {
     
     public void setNombre(String nombre) {
         this.nombre = nombre;
-    }
-    
-    public String getNombreAbreviado() {
-        return nombreAbreviado;
-    }
-    
-    public void setNombreAbreviado(String nombreAbreviado) {
-        this.nombreAbreviado = nombreAbreviado;
     }
     
     public ProvinciaEntity getProvincia() {

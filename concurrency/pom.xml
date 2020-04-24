@@ -21,7 +21,6 @@
         <validation-api.version>2.0.1.Final</validation-api.version>
         <spring-boot.version>2.1.1.RELEASE</spring-boot.version>
         <mssql-jdbc.version>6.2.1.jre8</mssql-jdbc.version>
-        <liquibase.properties>liquibase-generate.properties</liquibase.properties>
     </properties>
     
     <dependencies>
@@ -37,17 +36,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
-        </dependency>
-        
-        <!-- Liquibase -->
-        <dependency>
-            <groupId>org.liquibase</groupId>
-            <artifactId>liquibase-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.liquibase</groupId>
-            <artifactId>liquibase-maven-plugin</artifactId>
-            <version>3.5.5</version>
         </dependency>
         
         <!-- JDBC -->
@@ -102,77 +90,11 @@
         </dependency>
     </dependencies>
     
-    <profiles>
-        <profile>
-            <id>generate</id>
-            <properties>
-                <liquibase.properties>liquibase-generate.properties</liquibase.properties>
-            </properties>
-            <activation>
-                <activeByDefault>false</activeByDefault>
-            </activation>
-        </profile>
-        <profile>
-            <id>diff</id>
-            <properties>
-                <liquibase.properties>liquibase-diff.properties</liquibase.properties>
-            </properties>
-            <activation>
-                <activeByDefault>false</activeByDefault>
-            </activation>
-        </profile>
-        <profile>
-            <id>update</id>
-            <properties>
-                <liquibase.properties>liquibase-update.properties</liquibase.properties>
-            </properties>
-            <activation>
-                <activeByDefault>false</activeByDefault>
-            </activation>
-        </profile>
-        <profile>
-            <id>diff-entities</id>
-            <properties>
-                <liquibase.properties>liquibase-diff-entities.properties</liquibase.properties>
-            </properties>
-            <activation>
-                <activeByDefault>false</activeByDefault>
-            </activation>
-        </profile>
-    </profiles>
-    
     <build>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin> 
-            
-            <plugin>
-                <groupId>org.liquibase</groupId>
-                <artifactId>liquibase-maven-plugin</artifactId>
-                <version>3.5.5</version>
-                <configuration>
-                    <propertyFile>src/main/resources/${liquibase.properties}</propertyFile>
-                    <promptOnNonLocalDatabase>false</promptOnNonLocalDatabase>
-                </configuration> 
-                <dependencies>
-                    <dependency>
-                        <groupId>org.liquibase.ext</groupId>
-                        <artifactId>liquibase-hibernate5</artifactId>
-                        <version>3.6</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-data-jpa</artifactId>
-                        <version>${spring-boot.version}</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>javax.validation</groupId>
-                        <artifactId>validation-api</artifactId>
-                        <version>${validation-api.version}</version>
-                    </dependency>
-                </dependencies>
             </plugin>
             
             <plugin>
