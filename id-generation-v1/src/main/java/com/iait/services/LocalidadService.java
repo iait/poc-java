@@ -49,17 +49,26 @@ public class LocalidadService {
         
         LOG.info("Guardando localidad {}", nombre);
         
+        ProvinciaEntity provincia = provinciaRepository.findById(provinciaId).orElseThrow(
+                () -> new RuntimeException("No se encontró la provincia con id " + provinciaId));
+        Long id = repository.getMax(provincia).orElse(0L) + 1L;
+        LOG.info("MAX ID CALCULADO: {} PARA {}", id, nombre);
+        
+        if (delay > 0) {
+            try {
+                LOG.info("X-DELAY {} - Comenzando ....", delay);
+                TimeUnit.SECONDS.sleep(delay);
+                LOG.info("X-DELAY {} - Terminado!!!", delay);
+            } catch (InterruptedException ex) {
+                LOG.error("DELAY ERROR: {}", ex);
+            } 
+        }
+        
         LocalidadEntity entity = new LocalidadEntity();
         entity.setNombre(nombre);
         
-        ProvinciaEntity provincia = provinciaRepository.findById(provinciaId).orElseThrow(
-                () -> new RuntimeException("No se encontró la provincia con id " + provinciaId));
         entity.setProvincia(provincia);
-        
-        Long id = repository.getMax(provincia).orElse(0L) + 1L;
         entity.setId(id);
-        
-        TimeUnit.SECONDS.sleep(delay);
         
         return repository.save(entity);
     }

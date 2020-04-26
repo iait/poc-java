@@ -36,13 +36,23 @@ public class ProvinciaService {
         
         LOG.info("Guardando provincia {}", nombre);
         
+        long id = repository.getMax().orElse(0L) + 1L;
+        LOG.info("MAX ID CALCULADO: {} PARA {}", id, nombre);
+        
+        if (delay > 0) {
+            try {
+                LOG.info("X-DELAY {} - Comenzando ....", delay);
+                TimeUnit.SECONDS.sleep(delay);
+                LOG.info("X-DELAY {} - Terminado!!!", delay);
+            } catch (InterruptedException ex) {
+                LOG.error("DELAY ERROR: {}", ex);
+            } 
+        }
+        
         ProvinciaEntity entity = new ProvinciaEntity();
         entity.setNombre(nombre);
         
-        Long id = repository.getMax().orElse(0L) + 1L;
         entity.setId(id);
-        
-        TimeUnit.SECONDS.sleep(delay);
         
         return repository.save(entity);
     }
