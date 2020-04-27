@@ -3,10 +3,13 @@ package com.iait.entities;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
-import javax.persistence.TableGenerator;
+
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.annotations.Parameter;
+
+import com.iait.generator.CustomGenerator;
 
 @Entity
 @Table(name = "provincias")
@@ -14,9 +17,13 @@ public class ProvinciaEntity {
     
     @Id
     @Column(name = "id")
-    @GeneratedValue(generator = "provincias-generator", strategy = GenerationType.TABLE)
-    @TableGenerator(name = "provincias-generator", table = "id_gen", pkColumnName = "gen_key", 
-            valueColumnName = "gen_value", allocationSize = 1)
+    @GenericGenerator(name = "provincias_generator", 
+            strategy = "com.iait.generator.CustomGenerator",
+            parameters = {
+                    @Parameter(name = CustomGenerator.PK_COLUMN_VALUE, value = "provincias"),
+                    @Parameter(name = CustomGenerator.ALLOCATION_SIZE, value = "1")
+            })
+    @GeneratedValue(generator = "provincias_generator")
     private Long id;
     
     @Column(name = "nombre", nullable = false)

@@ -4,11 +4,16 @@ import javax.persistence.Column;
 import javax.persistence.EmbeddedId;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
+import javax.persistence.GeneratedValue;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.annotations.Parameter;
+
 import com.iait.entities.pk.LocalidadPkEntity;
+import com.iait.generator.CustomGenerator;
 import com.querydsl.core.annotations.PropertyType;
 import com.querydsl.core.annotations.QueryType;
 
@@ -18,6 +23,13 @@ public class LocalidadEntity {
     
     @EmbeddedId
     @QueryType(PropertyType.NONE)
+    @GenericGenerator(name = "localidades_generator", 
+    strategy = "com.iait.generator.CustomGenerator",
+    parameters = {
+            @Parameter(name = CustomGenerator.PK_COLUMN_VALUE, value = "localidades"),
+            @Parameter(name = CustomGenerator.ALLOCATION_SIZE, value = "1")
+    })
+    @GeneratedValue(generator = "localidades_generator")
     private LocalidadPkEntity pk;
     
     @ManyToOne(fetch = FetchType.LAZY)
