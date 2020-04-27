@@ -31,7 +31,6 @@ public class ProvinciaService {
         return repository.findById(id);
     }
     
-    @Transactional
     public ProvinciaEntity create(String nombre, long delay) throws InterruptedException {
         
         LOG.info("Guardando provincia {}", nombre);
