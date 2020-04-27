@@ -26,8 +26,8 @@ public class LocalidadEntity {
     @GenericGenerator(name = "localidades_generator", 
     strategy = "com.iait.generator.CustomGenerator",
     parameters = {
-            @Parameter(name = CustomGenerator.PK_COLUMN_VALUE, value = "localidades"),
-            @Parameter(name = CustomGenerator.ALLOCATION_SIZE, value = "1")
+            @Parameter(name = CustomGenerator.COMPOSITE_KEY, value = "true"),
+            @Parameter(name = CustomGenerator.ID_FIELD, value = "localidadId")
     })
     @GeneratedValue(generator = "localidades_generator")
     private LocalidadPkEntity pk;
@@ -51,6 +51,10 @@ public class LocalidadEntity {
         this();
         setProvincia(provincia);
         setId(id);
+    }
+    
+    public LocalidadPkEntity getPk() {
+        return pk;
     }
 
     public ProvinciaEntity getProvincia() {

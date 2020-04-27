@@ -51,8 +51,6 @@ public class LocalidadService {
         
         ProvinciaEntity provincia = provinciaRepository.findById(provinciaId).orElseThrow(
                 () -> new RuntimeException("No se encontró la provincia con id " + provinciaId));
-        Long id = repository.getMax(provincia).orElse(0L) + 1L;
-        LOG.info("MAX ID CALCULADO: {} PARA {}", id, nombre);
         
         if (delay > 0) {
             try {
@@ -68,7 +66,6 @@ public class LocalidadService {
         entity.setNombre(nombre);
         
         entity.setProvincia(provincia);
-        entity.setId(id);
         
         return repository.save(entity);
     }

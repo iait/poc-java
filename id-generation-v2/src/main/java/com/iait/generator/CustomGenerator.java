@@ -23,6 +23,8 @@ public class CustomGenerator implements PersistentIdentifierGenerator, Configura
     public static final String PK_COLUMN_NAME = "pkColumnName";
     public static final String PK_COLUMN_VALUE = "pkColumnValue";
     public static final String VALUE_COLUMN_NAME = "valueColumnName";
+    public static final String COMPOSITE_KEY = "compositeKey";
+    public static final String ID_FIELD = "idField";
     
     private static final String TARGET_TABLE = "target_table";
     private static final Map<String, String> propertiesMap;
@@ -73,7 +75,7 @@ public class CustomGenerator implements PersistentIdentifierGenerator, Configura
         
         String tableName = params.getProperty(TARGET_TABLE);
         params.setProperty(propertiesMap.get(ALLOCATION_SIZE), 
-                params.getProperty(ALLOCATION_SIZE, "50"));
+                params.getProperty(ALLOCATION_SIZE, "1"));
         params.setProperty(propertiesMap.get(INITIAL_VALUE), 
                 params.getProperty(INITIAL_VALUE, "1"));
         params.setProperty(propertiesMap.get(TABLE), 

@@ -1,14 +1,17 @@
 package com.iait.generator;
 
 import java.io.Serializable;
+import java.lang.reflect.InvocationTargetException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import org.hibernate.HibernateException;
 import org.hibernate.LockMode;
@@ -39,6 +42,7 @@ import org.hibernate.id.PersistentIdentifierGenerator;
 import org.hibernate.id.enhanced.AccessCallback;
 import org.hibernate.id.enhanced.Optimizer;
 import org.hibernate.id.enhanced.OptimizerFactory;
+import org.hibernate.id.enhanced.StandardOptimizerDescriptor;
 import org.hibernate.internal.CoreMessageLogger;
 import org.hibernate.internal.util.StringHelper;
 import org.hibernate.internal.util.config.ConfigurationHelper;
@@ -50,13 +54,7 @@ import org.hibernate.service.ServiceRegistry;
 import org.hibernate.type.LongType;
 import org.hibernate.type.StringType;
 import org.hibernate.type.Type;
-
 import org.jboss.logging.Logger;
-import org.springframework.util.SerializationUtils;
-
-import com.iait.entities.LocalidadEntity;
-import com.iait.entities.ProvinciaEntity;
-import com.iait.entities.pk.LocalidadPkEntity;
 
 public class CustomTableGenerator implements PersistentIdentifierGenerator, Configurable {
     private static final CoreMessageLogger LOG = Logger.getMessageLogger(
@@ -161,6 +159,10 @@ public class CustomTableGenerator implements PersistentIdentifierGenerator, Conf
     private String segmentColumnName;
     private String segmentValue;
     private int segmentValueLength;
+    
+    private boolean compositeKey;
+    private String idField;
+    private String capitalizedIdField;
 
     private String valueColumnName;
     private int initialValue;
@@ -291,6 +293,11 @@ public class CustomTableGenerator implements PersistentIdentifierGenerator, Conf
         valueColumnName = determineValueColumnName( params, jdbcEnvironment );
 
         segmentValue = determineSegmentValue( params );
+        
+        compositeKey = "true".equals(params.getProperty(CustomGenerator.COMPOSITE_KEY));
+        idField = params.getProperty(CustomGenerator.ID_FIELD);
+        capitalizedIdField = idField == null || idField.isEmpty() ? idField 
+                : idField.substring(0, 1).toUpperCase() + idField.substring(1);
 
         segmentValueLength = determineSegmentColumnSize( params );
         initialValue = determineInitialValue( params );
@@ -468,11 +475,8 @@ public class CustomTableGenerator implements PersistentIdentifierGenerator, Conf
         return new InitCommand( "insert into " + renderedTableName + "(" + segmentColumnName + ", " + valueColumnName + ")" + " values ('" + segmentValue + "'," + ( value ) + ")" );
     }
 
-    private IntegralDataTypeHolder makeValue() {
-        Class type = identifierType.getReturnedClass();
-        if (type.isAssignableFrom(LocalidadPkEntity.class)) {
-            return IdentifierGeneratorHelper.getIntegralDataTypeHolder(Long.class);
-        }
+    @SuppressWarnings("rawtypes")
+    private IntegralDataTypeHolder makeValue(Class type) {
         return IdentifierGeneratorHelper.getIntegralDataTypeHolder( type );
     }
 
@@ -484,16 +488,38 @@ public class CustomTableGenerator implements PersistentIdentifierGenerator, Conf
         final SessionEventListenerManager statsCollector = session.getEventListenerManager();
         
         final String localSegmentValue;
+        final Serializable pk;
+        final Class<?> type;
         
-        final ProvinciaEntity provincia;
-        if (obj instanceof LocalidadEntity) {
-            LocalidadEntity localidad = (LocalidadEntity) obj;
-            provincia = localidad.getProvincia();
-            String str = "-provincia:" + provincia.getId().toString();
-            localSegmentValue = segmentValue + str;
+        if (compositeKey) {
+            try {
+                pk  = (Serializable) obj.getClass().getMethod("getPk").invoke(obj);
+            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException e) {
+                throw new RuntimeException(e);
+            }
+            String condition = Arrays.stream(pk.getClass().getMethods())
+                    .filter(m -> m.getName().startsWith("get") 
+                            && !m.getName().equals("get" + capitalizedIdField)
+                            && !m.getName().equals("getClass"))
+                    .map(m -> {
+                        try {
+                            return String.format("%s=%s", 
+                                    m.getName().substring(3), m.invoke(pk).toString());
+                        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                            throw new RuntimeException(e);
+                        }
+                    })
+                    .collect(Collectors.joining(","));
+            try {
+                type = pk.getClass().getDeclaredField(idField).getType();
+            } catch (NoSuchFieldException | SecurityException e) {
+                throw new RuntimeException(e);
+            }
+            localSegmentValue = segmentValue + "-" + condition;
         } else {
-            provincia = null;
             localSegmentValue = segmentValue;
+            pk = null;
+            type = identifierType.getReturnedClass();
         }
 
         Serializable result = optimizer.generate(new AccessCallback() {
@@ -505,7 +531,7 @@ public class CustomTableGenerator implements PersistentIdentifierGenerator, Conf
 
                             @Override
                             public IntegralDataTypeHolder execute(Connection connection) throws SQLException {
-                              final IntegralDataTypeHolder value = makeValue();
+                              final IntegralDataTypeHolder value = makeValue(type);
                               int rows;
                               do {
 
@@ -600,11 +626,12 @@ public class CustomTableGenerator implements PersistentIdentifierGenerator, Conf
         });
         
         System.out.println();
-        Class type = identifierType.getReturnedClass();
-        if (type.isAssignableFrom(LocalidadPkEntity.class)) {
-            LocalidadPkEntity pk = new LocalidadPkEntity();
-            pk.setProvinciaId(provincia.getId());
-            pk.setLocalidadId((Long) result);
+        if (compositeKey) {
+            try {
+                pk.getClass().getMethod("set" + capitalizedIdField, type).invoke(pk, result);
+            } catch (SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException e) {
+                throw new RuntimeException(e);
+            }
             return pk;
         } else {
             return result;
