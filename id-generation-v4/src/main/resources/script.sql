@@ -30,3 +30,15 @@ CREATE TABLE sequence_table (
     query_id varchar(100) PRIMARY KEY,
     ult_valor bigint
 );
+
+----------------------------
+
+select * from provincias;
+select * from localidades;
+select * from sequence_table;
+
+/*
+delete from provincias;
+delete from localidades;
+delete from sequence_table;
+*/

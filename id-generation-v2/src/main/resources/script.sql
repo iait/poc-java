@@ -30,3 +30,15 @@ CREATE TABLE id_gen (
     gen_key varchar(100) PRIMARY KEY,
     gen_value bigint
 );
+
+------------------------
+
+select * from provincias;
+select * from localidades;
+select * from id_gen;
+
+/*
+delete from provincias;
+delete from localidades;
+delete from id_gen;
+*/
