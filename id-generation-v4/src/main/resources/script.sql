@@ -42,3 +42,8 @@ delete from provincias;
 delete from localidades;
 delete from sequence_table;
 */
+
+
+ALTER TABLE provincias
+ADD CONSTRAINT UC_provincias UNIQUE (nombre);
+

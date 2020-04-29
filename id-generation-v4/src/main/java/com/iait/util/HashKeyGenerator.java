@@ -17,23 +17,31 @@ import java.util.stream.Collectors;
 
 import javax.persistence.Column;
 import javax.persistence.Table;
+import javax.transaction.Status;
+import javax.transaction.Synchronization;
 
 import org.hibernate.HibernateException;
 import org.hibernate.LockMode;
 import org.hibernate.LockOptions;
 import org.hibernate.MappingException;
+import org.hibernate.Transaction;
 import org.hibernate.boot.model.naming.Identifier;
 import org.hibernate.boot.model.relational.Database;
 import org.hibernate.boot.model.relational.QualifiedName;
 import org.hibernate.boot.model.relational.QualifiedNameParser;
 import org.hibernate.dialect.Dialect;
+import org.hibernate.engine.jdbc.connections.spi.JdbcConnectionAccess;
 import org.hibernate.engine.jdbc.env.spi.JdbcEnvironment;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
+import org.hibernate.engine.transaction.spi.IsolationDelegate;
 import org.hibernate.id.Configurable;
 import org.hibernate.id.PersistentIdentifierGenerator;
 import org.hibernate.internal.util.config.ConfigurationHelper;
 import org.hibernate.jdbc.AbstractReturningWork;
+import org.hibernate.jdbc.WorkExecutor;
 import org.hibernate.jdbc.WorkExecutorVisitable;
+import org.hibernate.resource.jdbc.spi.JdbcSessionOwner;
+import org.hibernate.resource.transaction.spi.TransactionCoordinatorOwner;
 import org.hibernate.service.ServiceRegistry;
 import org.hibernate.type.Type;
 
@@ -113,8 +121,49 @@ public class HashKeyGenerator implements PersistentIdentifierGenerator, Configur
                 }
             }
         };
-        return session.getTransactionCoordinator().createIsolationDelegate()
-                .delegateWork(work, true);
+        
+        Transaction transaction = session.accessTransaction();
+        
+        try {
+            JdbcConnectionAccess connectionAccess = session.getJdbcCoordinator()
+                    .getJdbcSessionOwner()
+                    .getJdbcConnectionAccess();
+            Connection connection = connectionAccess.obtainConnection();
+            connection.setAutoCommit(false);
+            Serializable result = work.accept(new WorkExecutor<>(), connection);
+            
+            transaction.registerSynchronization(new Synchronization() {
+                
+                @Override
+                public void beforeCompletion() {
+                    
+                }
+                
+                @Override
+                public void afterCompletion(int status) {
+                    try {
+                        if (Status.STATUS_COMMITTED == status) {
+                            connection.commit();
+                                
+                        } else {
+                            connection.rollback();
+                        }
+                        connection.setAutoCommit(true);
+                        connectionAccess.releaseConnection(connection);
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+            
+
+            return result;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+//        return session.getTransactionCoordinator().createIsolationDelegate()
+//                .delegateWork(work, false);
     }
     
     @Override
