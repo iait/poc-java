@@ -25,23 +25,16 @@ import org.hibernate.LockMode;
 import org.hibernate.LockOptions;
 import org.hibernate.MappingException;
 import org.hibernate.Transaction;
-import org.hibernate.boot.model.naming.Identifier;
 import org.hibernate.boot.model.relational.Database;
-import org.hibernate.boot.model.relational.QualifiedName;
-import org.hibernate.boot.model.relational.QualifiedNameParser;
 import org.hibernate.dialect.Dialect;
 import org.hibernate.engine.jdbc.connections.spi.JdbcConnectionAccess;
-import org.hibernate.engine.jdbc.env.spi.JdbcEnvironment;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
-import org.hibernate.engine.transaction.spi.IsolationDelegate;
 import org.hibernate.id.Configurable;
 import org.hibernate.id.PersistentIdentifierGenerator;
 import org.hibernate.internal.util.config.ConfigurationHelper;
 import org.hibernate.jdbc.AbstractReturningWork;
 import org.hibernate.jdbc.WorkExecutor;
 import org.hibernate.jdbc.WorkExecutorVisitable;
-import org.hibernate.resource.jdbc.spi.JdbcSessionOwner;
-import org.hibernate.resource.transaction.spi.TransactionCoordinatorOwner;
 import org.hibernate.service.ServiceRegistry;
 import org.hibernate.type.Type;
 
@@ -50,11 +43,9 @@ public class HashKeyGenerator implements PersistentIdentifierGenerator, Configur
     public static final String COMPOSITE_KEY = "compositeKey";
     public static final String ID_FIELD = "idField";
     public static final String USE_HASH = "useHash";
-    public static final String TABLE_PARAM = "table_name";
-    public static final String CATALOG = "catalog";
-    public static final String SCHEMA = "schema";
-    public static final String VALUE_COLUMN_PARAM = "value_column_name";
-    public static final String SEGMENT_COLUMN_PARAM = "segment_column_name";
+    public static final String TABLE_PARAM = "tableName";
+    public static final String SEGMENT_COLUMN_PARAM = "segmentColumnName";
+    public static final String VALUE_COLUMN_PARAM = "valueColumnName";
     
     private boolean isCompositeKey;
     private String idField;
@@ -62,13 +53,9 @@ public class HashKeyGenerator implements PersistentIdentifierGenerator, Configur
     private Type identifierType;
     private boolean useHash;
     
+    private String tableName;
     private String valueColumnName;
     private String segmentColumnName;
-    
-    private String tableName;
-    private String catalog;
-    private String schema;
-    private QualifiedName qualifiedTableName;
     
     private String selectQuery;
     private String insertQuery;
@@ -78,8 +65,6 @@ public class HashKeyGenerator implements PersistentIdentifierGenerator, Configur
     public void configure(
             Type type, Properties params, ServiceRegistry serviceRegistry) throws MappingException {
         
-        final JdbcEnvironment jdbcEnvironment = serviceRegistry.getService(JdbcEnvironment.class);
-        
         this.isCompositeKey = "true".equals(params.getProperty(COMPOSITE_KEY));
         this.useHash = "true".equals(params.getProperty(USE_HASH));
         this.idField = params.getProperty(ID_FIELD);
@@ -87,23 +72,31 @@ public class HashKeyGenerator implements PersistentIdentifierGenerator, Configur
         this.capitalizedIdField = idField == null || idField.isEmpty() ? idField 
                 : idField.substring(0, 1).toUpperCase() + idField.substring(1);
         
-        this.tableName = ConfigurationHelper.getString(TABLE_PARAM, params, "id_gen");
-        this.catalog = params.getProperty(CATALOG);
-        this.schema = params.getProperty(SCHEMA);
-        if (tableName.contains(".")) {
-            qualifiedTableName = QualifiedNameParser.INSTANCE.parse(tableName);
-        } else {
-            Identifier catalogId = jdbcEnvironment.getIdentifierHelper().toIdentifier(catalog);
-            Identifier schemaId = jdbcEnvironment.getIdentifierHelper().toIdentifier(schema);
-            Identifier tableNameId = jdbcEnvironment.getIdentifierHelper().toIdentifier(tableName);
-            qualifiedTableName = new QualifiedNameParser.NameParts(
-                    catalogId, schemaId, tableNameId);
-        }
-        
+        this.tableName = ConfigurationHelper.getString(
+                TABLE_PARAM, params, "id_gen");
         this.valueColumnName = ConfigurationHelper.getString(
                 VALUE_COLUMN_PARAM, params, "gen_value");
         this.segmentColumnName = ConfigurationHelper.getString(
                 SEGMENT_COLUMN_PARAM, params, "gen_key");
+    }
+    
+    @Override
+    public void registerExportables(Database database) {
+        Dialect dialect = database.getJdbcEnvironment().getDialect();
+        
+        String select = String.format("select tbl.%s from %s tbl where tbl.%s=?", 
+                valueColumnName, tableName, segmentColumnName);
+        LockOptions lockOptions = new LockOptions(LockMode.PESSIMISTIC_WRITE);
+        lockOptions.setAliasSpecificLockMode("tbl", LockMode.PESSIMISTIC_WRITE);
+        Map<String, String[]> updateTargetColumnsMap = Collections.singletonMap(
+                "tbl", new String[] {segmentColumnName});
+        selectQuery = dialect.applyLocksToSql(select, lockOptions, updateTargetColumnsMap);
+        
+        updateQuery = String.format("update %s set %s=? where %s=?", 
+                tableName, valueColumnName, segmentColumnName);
+        
+        insertQuery = String.format("insert into %s (%s, %s) values (?, ?)", 
+                tableName, segmentColumnName, valueColumnName);
     }
 
     @Override
@@ -167,26 +160,6 @@ public class HashKeyGenerator implements PersistentIdentifierGenerator, Configur
     }
     
     @Override
-    public void registerExportables(Database database) {
-        Dialect dialect = database.getJdbcEnvironment().getDialect();
-        
-        String select = "select tbl." + valueColumnName +
-                " from " + tableName + " tbl where tbl." + segmentColumnName + "=?";
-        LockOptions lockOptions = new LockOptions(LockMode.PESSIMISTIC_WRITE);
-        lockOptions.setAliasSpecificLockMode("tbl", LockMode.PESSIMISTIC_WRITE);
-        Map<String, String[]> updateTargetColumnsMap = Collections.singletonMap(
-                "tbl", new String[] {valueColumnName});
-        selectQuery = dialect.applyLocksToSql(select, lockOptions, updateTargetColumnsMap);
-        
-        updateQuery = "update " + tableName +
-                " set " + valueColumnName + "=? " +
-                " where " + segmentColumnName + "=?";
-        
-        insertQuery = "insert into " + tableName 
-                + " (" + segmentColumnName + ", " + valueColumnName + ") " + " values (?,?)";
-    }
-    
-    @Override
     @Deprecated
     public String[] sqlCreateStrings(Dialect dialect) throws HibernateException {
         throw new UnsupportedOperationException();
@@ -199,8 +172,8 @@ public class HashKeyGenerator implements PersistentIdentifierGenerator, Configur
     }
     
     @Override
-    public Object generatorKey() {
-        return qualifiedTableName.render();
+    public String generatorKey() {
+        return tableName;
     }
     
     private Serializable simpleKey(Connection connection, Object object) 
@@ -263,14 +236,14 @@ public class HashKeyGenerator implements PersistentIdentifierGenerator, Configur
                 value = rs.getLong(1) + 1L;
                 exists = true;
             }
-            try {
-                if (delay) {
-                    delay = false;
-                    TimeUnit.SECONDS.sleep(10);
-                }
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+//            try {
+//                if (delay) {
+//                    delay = false;
+//                    TimeUnit.SECONDS.sleep(10);
+//                }
+//            } catch (InterruptedException e) {
+//                throw new RuntimeException(e);
+//            }
             stmt.close();
             
             if (!exists) {
@@ -298,69 +271,6 @@ public class HashKeyGenerator implements PersistentIdentifierGenerator, Configur
             throw new RuntimeException(e);
         }
     }
-    
-//    private Long ultValor(String keyName, Connection conn) 
-//            throws UnsupportedEncodingException {
-//
-//        String key = useHash 
-//                ? SerializationUtils.calcularHash(keyName.getBytes("UTF-8")) : keyName;
-//        
-//        String query = "SELECT ult_valor FROM sequence_table WHERE query_id = ?";
-//        
-//        try {
-//            conn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-//            PreparedStatement stmtSelect = conn.prepareStatement(query);
-//            stmtSelect.setString(1, key);
-//            
-//            ResultSet rs = stmtSelect.executeQuery();
-//            long ultValor = 0;
-//            
-//            if (rs.next()) {
-//                ultValor = rs.getLong(1);
-//            }
-//            
-//            try {
-//                if (delay) {
-//                    delay = false;
-//                    TimeUnit.SECONDS.sleep(10);
-//                }
-//            } catch (InterruptedException e) {
-//                throw new RuntimeException(e);
-//            }
-//            
-//            stmtSelect.close();
-//            
-//            if (ultValor == 0) {
-//                
-//                ultValor++;
-//                String insert = "INSERT INTO sequence_table (query_id, ult_valor) VALUES (?, ?)";
-//                
-//                PreparedStatement stmtInsert = conn.prepareStatement(insert);
-//                stmtInsert.setString(1, key);
-//                stmtInsert.setLong(2, ultValor);
-//                
-//                stmtInsert.executeUpdate();
-//                stmtInsert.close();
-//            
-//            } else {
-//                
-//                ultValor++;
-//                String update = "UPDATE sequence_table SET ult_valor = ? WHERE query_id = ?";
-//                
-//                PreparedStatement stmtUpdate = conn.prepareStatement(update);
-//                stmtUpdate.setLong(1, ultValor);
-//                stmtUpdate.setString(2, key);
-//                
-//                stmtUpdate.executeUpdate();
-//                stmtUpdate.close();
-//            }
-//            
-//            return ultValor;
-//            
-//        } catch (SQLException e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
     
     private String compositeKeyName(String tableName, Object object) throws HibernateException {
         

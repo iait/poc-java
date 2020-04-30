@@ -26,23 +26,22 @@ REFERENCES provincias (id);
 
 ------------------------
 
-CREATE TABLE sequence_table (
-    query_id varchar(100) PRIMARY KEY,
-    ult_valor bigint
+CREATE TABLE id_gen (
+    gen_key varchar(100) PRIMARY KEY,
+    gen_value bigint
 );
 
 ----------------------------
 
 select * from provincias;
 select * from localidades;
-select * from sequence_table;
+select * from id_gen;
 
 /*
 delete from provincias;
 delete from localidades;
-delete from sequence_table;
+delete from id_gen;
 */
-
 
 ALTER TABLE provincias
 ADD CONSTRAINT UC_provincias UNIQUE (nombre);

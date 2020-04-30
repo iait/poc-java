@@ -7,6 +7,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +29,8 @@ import com.iait.services.ProvinciaService;
 public class ProvinciaCtrl {
     
     private static final Logger LOG = LoggerFactory.getLogger(ProvinciaCtrl.class);
+    
+    @Autowired private PlatformTransactionManager tm;
     
     @Autowired
     private ProvinciaService service;
@@ -50,7 +56,29 @@ public class ProvinciaCtrl {
             @RequestHeader(value = "x-delay", required = false, defaultValue = "0") long delay) 
                     throws InterruptedException {
         LOG.info("Header X-DELAY: {}", delay);
-        ProvinciaEntity entity = service.create(request.getNombre(), delay);
+        
+        TransactionTemplate template = new TransactionTemplate(tm);
+        
+        ProvinciaEntity entity = template.execute(new TransactionCallback<ProvinciaEntity>() {
+
+            @Override
+            public ProvinciaEntity doInTransaction(TransactionStatus status) {
+                
+                ProvinciaEntity provinciaEntity;
+                try {
+                    provinciaEntity = service.create(request.getNombre(), delay);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                
+                LOG.info("Provincia - doInTransaction: haciendo rollback");
+                status.setRollbackOnly();
+                
+                return provinciaEntity;
+            }
+        });
+        
+//        ProvinciaEntity entity = service.create(request.getNombre(), delay);
         ProvinciaResponse response = new ProvinciaResponse(entity);
         return ResponseEntity.ok(response);
     }
